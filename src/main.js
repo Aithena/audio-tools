@@ -1,17 +1,11 @@
 import "./style.css";
 import { mountCloudTts } from "./tools/cloud-tts.js";
-import { mountMossTtsNano } from "./tools/moss-tts-nano.js";
 
 const tools = [
   {
     id: "cloud-tts",
     name: "云端 TTS",
     mount: mountCloudTts,
-  },
-  {
-    id: "moss-tts-nano",
-    name: "MOSS-TTS-Nano",
-    mount: mountMossTtsNano,
   },
 ];
 
