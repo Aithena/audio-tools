@@ -13,7 +13,7 @@ const mossProxy = {
         res.writeHead(502, { "Content-Type": "application/json; charset=utf-8" });
         res.end(
           JSON.stringify({
-            error: "本机 18083 未启动。请先运行 moss-tts-nano serve --backend onnx",
+            error: "本机 18083 未启动。请先运行 moss-tts-nano serve --backend onnx --execution-provider cuda",
             detail: error.code || error.message,
           }),
         );

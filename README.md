@@ -22,7 +22,7 @@ cd D:\Apps\MOSS-TTS-Nano
 py -3.10 -m venv .venv
 .venv\Scripts\python -m pip install -U pip
 .venv\Scripts\python -m pip install -e .
-.venv\Scripts\moss-tts-nano serve --backend onnx
+.venv\Scripts\moss-tts-nano serve --backend onnx --execution-provider cuda
 ```
 
 默认地址是 `http://127.0.0.1:18083`。首次启动会下载模型，请保持终端开着。

@@ -17,7 +17,7 @@ const SETUP = `cd D:\\Apps\\MOSS-TTS-Nano
 py -3.10 -m venv .venv
 .venv\\Scripts\\python -m pip install -U pip
 .venv\\Scripts\\python -m pip install -e .
-.venv\\Scripts\\moss-tts-nano serve --backend onnx`;
+.venv\\Scripts\\moss-tts-nano serve --backend onnx --execution-provider cuda`;
 
 const STORAGE_KEY = "audio-tools.moss-tts-endpoint";
 const PLAY_KEY = "audio-tools.moss-tts-play-mode";
@@ -74,7 +74,16 @@ function resolveApiUrl(base, url) {
 }
 
 function isAbortError(error) {
-  return error?.name === "AbortError" || /aborted|abort/i.test(error?.message || "");
+  return error?.name === "AbortError" || error?.name === "TimeoutError" || /aborted|abort|timeout/i.test(error?.message || "");
+}
+
+function timeoutSignal(ms) {
+  if (typeof AbortSignal !== "undefined" && typeof AbortSignal.timeout === "function") {
+    return AbortSignal.timeout(ms);
+  }
+  const controller = new AbortController();
+  window.setTimeout(() => controller.abort(), ms);
+  return controller.signal;
 }
 
 function mergeUint8Arrays(a, b) {
@@ -84,7 +93,7 @@ function mergeUint8Arrays(a, b) {
   return merged;
 }
 
-const OFFLINE_MSG = "本机 18083 未启动。请先运行 moss-tts-nano serve --backend onnx";
+const OFFLINE_MSG = "本机 18083 未启动。请先运行 moss-tts-nano serve --backend onnx --execution-provider cuda";
 
 function parseError(text, status) {
   const raw = String(text || "").trim();
@@ -430,6 +439,7 @@ export function mountMossTtsNano(root) {
   let nextPlaybackTime = 0;
   let streamStartAt = null;
   let streamDuration = 0;
+  let lastHealth = null;
 
   function setStatus(type, text) {
     status.className = `status${type ? ` ${type}` : ""}`;
@@ -556,16 +566,18 @@ export function mountMossTtsNano(root) {
   }
 
   async function ping() {
+    if (running) return true;
     const base = resolveBase(endpointInput.value);
     endpointInput.value = base;
     localStorage.setItem(STORAGE_KEY, base);
     setDot("busy");
     setStatus("", "正在检测本地服务…");
     try {
-      const health = await fetchJson(joinUrl(base, "/health"));
+      const health = await fetchJson(joinUrl(base, "/health"), { signal: timeoutSignal(4000) });
+      lastHealth = health;
       let extra = health.device ? ` · ${health.device}` : "";
       try {
-        const warmup = await fetchJson(joinUrl(base, "/api/warmup-status"));
+        const warmup = await fetchJson(joinUrl(base, "/api/warmup-status"), { signal: timeoutSignal(4000) });
         extra += warmup.status_text ? ` · ${warmup.status_text}` : "";
       } catch {
         /* warmup 接口因版本可能不存在 */
@@ -577,7 +589,7 @@ export function mountMossTtsNano(root) {
     } catch (error) {
       setDot("err");
       if (setupPanel) setupPanel.open = true;
-      setStatus("err", friendlyError(error));
+      setStatus("err", isAbortError(error) ? OFFLINE_MSG : friendlyError(error));
       return false;
     }
   }
@@ -592,6 +604,10 @@ export function mountMossTtsNano(root) {
     }
     formData.append("enable_text_normalization", "0");
     formData.append("enable_normalize_tts_text", "1");
+    const cpuThreads = Number(lastHealth?.default_cpu_threads);
+    if (Number.isFinite(cpuThreads) && cpuThreads > 0) {
+      formData.append("cpu_threads", String(cpuThreads));
+    }
     return formData;
   }
 
@@ -684,6 +700,8 @@ export function mountMossTtsNano(root) {
       });
     } catch (error) {
       if (isAbortError(error) || isOfflineError(error)) throw error;
+      const missingStream = /HTTP 404|Not Found|Method Not Allowed/i.test(error?.message || "");
+      if (!missingStream) throw error;
       setStatus("", "流式接口不可用，改为整段合成…");
       await generateBuffered(base);
       return;
@@ -710,12 +728,18 @@ export function mountMossTtsNano(root) {
       try {
         const snapshot = await fetchJson(resolveApiUrl(base, startData.status_url));
         if (snapshot.failed) throw new Error(snapshot.error || snapshot.status_text || "流式合成失败");
-        const bits = [snapshot.status_text || snapshot.run_status || "流式合成中"];
+        const device = String(lastHealth?.device || snapshot.execution_device || "").toLowerCase();
+        let headline = snapshot.status_text || snapshot.run_status || "流式合成中";
+        if (device.includes("cuda")) headline = headline.replace(/exec=cpu\b/gi, "exec=cuda");
+        const bits = [headline];
         if (snapshot.first_audio_latency_seconds != null) {
           bits.push(`首包 ${Number(snapshot.first_audio_latency_seconds).toFixed(2)}s`);
         }
-        if (snapshot.emitted_audio_seconds != null) {
-          bits.push(`已出 ${Number(snapshot.emitted_audio_seconds).toFixed(1)}s`);
+        const emitted = Number(snapshot.emitted_audio_seconds);
+        if (Number.isFinite(emitted) && emitted > 0) {
+          bits.push(`已出 ${emitted.toFixed(1)}s`);
+        } else if (!snapshot.first_audio_latency_seconds) {
+          bits.push(device.includes("cuda") ? "等待 GPU 首包" : "等待首包");
         }
         setStatus("", bits.join(" · "));
       } catch (error) {
