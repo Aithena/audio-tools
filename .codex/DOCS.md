@@ -9,7 +9,7 @@
 - 技术栈：Vite 7 + 原生 JavaScript（ESM，无框架），`ws`（Node 端 Edge TTS 用），无 CSS 框架。
 - 页面结构对齐 [str-tools](https://github.com/Aithena/str-tools)。
 - 默认免费方案：微软 Edge 在线朗读（无需 API Key）；可选阿里云百炼 CosyVoice 或硅基流动 CosyVoice2（音质更好，需 Key）。
-- 支持部署到 GitHub Pages（但云端合成功能只在本地 `npm run dev` 下可用，见 §9）。
+- 支持部署到 GitHub Pages：部署后百炼/硅基流动通过浏览器直连云端（CORS 已验证可用）；Edge 免费依赖本地代理，仅本地 `npm run dev` 可用（见 §8、§9）。
 
 ## 2. 目录结构
 
@@ -160,12 +160,12 @@ npm run preview    # 预览产物，同端口
 
 `.github/workflows/deploy.yml`：push 到 `main`（或手动触发）→ Node 22 `npm ci` → `GITHUB_PAGES=true npm run build` → 上传 `dist/` → deploy-pages。发布后站点位于 `https://<user>.github.io/audio-tools/`。
 
-> 注意：GitHub Pages 上 `isLocalPage()` 为 false，`generate()` 会直接提示「云端合成请用本地 npm run dev 打开」，因此线上是静态展示，合成请本地跑。
+> 部署差异：GitHub Pages 上 `isLocalPage()` 为 false，Edge 免费会提示「Edge 免费需要本地代理（npm run dev）」，需切换为百炼/硅基流动（两个云端 API 均支持 CORS 直连，百炼结果桶也带 `Access-Control-Allow-Origin: *`）。
 
 ## 9. 已知限制与注意事项
 
 - Edge 免费服务为逆向接口：依赖固定 Token/版本号，微软可能限流或变更协议，`CHROMIUM_FULL_VERSION`、Token 需要时可更新。
-- 云端合成（含 Edge）全部要求本地页面；本地开发代理是功能的前提。
+- Edge 免费依赖本地 Node 代理（/edge-tts 与 WebSocket），静态部署站点不可用；百炼/硅基流动在部署站点可直接用（已实测 CORS 预检通过）。
 - `/cloud-audio` 代理白名单只放行阿里云域名，其它厂商音频直链会失败。
 - 错误信息做了本地化：401 / `InvalidApiKey` → 「API Key 无效」；命中 `Arrearage|quota|余额|欠费` → 「账号余额不足或已欠费」；超长原文回退为 `HTTP <状态码>`。
 - UI 快捷键：`Ctrl/Cmd + Enter` 生成；生成中再点按钮 = 停止（AbortController）。

@@ -435,7 +435,7 @@ export function mountCloudTts(root) {
     if (providerId === "edge") {
       setDot("ok");
       setupPanel.open = false;
-      setStatus("ok", "Edge 免费音色，无需 API Key");
+      setStatus("ok", isLocalPage() ? "Edge 免费音色，无需 API Key" : "Edge 免费仅限本地；部署站点请用百炼/硅基流动");
       return;
     }
     keyInput.placeholder = PROVIDERS[providerId].keyHint;
@@ -519,8 +519,8 @@ export function mountCloudTts(root) {
       setStatus("err", `请先填写 ${PROVIDERS[providerId].name} 的 API Key`);
       return;
     }
-    if (!isLocalPage()) {
-      setStatus("err", "云端合成请用本地 npm run dev 打开，以便代理转发请求");
+    if (providerId === "edge" && !isLocalPage()) {
+      setStatus("err", "Edge 免费需要本地代理（npm run dev）；部署站点请改用百炼或硅基流动");
       return;
     }
 
