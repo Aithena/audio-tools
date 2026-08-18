@@ -2,7 +2,10 @@
 
 本地声音工具集合。页面结构对齐 [str-tools](https://github.com/Aithena/str-tools)：顶栏切换工具，中间双栏工作区。
 
-当前第一个工具是 **MOSS-TTS-Nano** 本地部署与合成。
+当前工具：
+
+- **云端 TTS**：默认 **Edge 免费**（微软在线朗读，无需 Key）。也可填阿里云百炼 / 硅基流动，音质更好。
+- **MOSS-TTS-Nano**：本机 ONNX 合成，可离线，但音质一般。
 
 ## 启动网页
 
@@ -11,7 +14,10 @@ npm install
 npm run dev
 ```
 
-浏览器打开 [http://127.0.0.1:18808](http://127.0.0.1:18808)。开发服务器会把 `/moss-tts` 代理到本机 `18083`。
+浏览器打开 [http://127.0.0.1:18808](http://127.0.0.1:18808)。开发服务器会代理：
+
+- `/moss-tts` → 本机 `18083`
+- `/dashscope`、`/siliconflow` → 云端 TTS，避免浏览器跨域
 
 ## 启动 MOSS-TTS-Nano
 
